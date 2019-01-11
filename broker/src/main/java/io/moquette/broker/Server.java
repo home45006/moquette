@@ -263,48 +263,4 @@ public class Server {
 
         LOG.info("Moquette integration has been stopped.");
     }
-
-    /**
-     * SPI method used by Broker embedded applications to get list of subscribers. Returns null if
-     * the broker is not started.
-     *
-     * @return list of subscriptions.
-     */
-// TODO reimplement this
-//    public List<Subscription> getSubscriptions() {
-//        if (m_processorBootstrapper == null) {
-//            return null;
-//        }
-//        return this.subscriptionsStore.listAllSubscriptions();
-//    }
-
-    /**
-     * SPI method used by Broker embedded applications to add intercept handlers.
-     *
-     * @param interceptHandler the handler to add.
-     */
-    public void addInterceptHandler(InterceptHandler interceptHandler) {
-        if (!initialized) {
-            LOG.error("Moquette is not started, MQTT message interceptor cannot be added. InterceptorId={}",
-                interceptHandler.getID());
-            throw new IllegalStateException("Can't register interceptors on a integration that is not yet started");
-        }
-        LOG.info("Adding MQTT message interceptor. InterceptorId={}", interceptHandler.getID());
-        interceptor.addInterceptHandler(interceptHandler);
-    }
-
-    /**
-     * SPI method used by Broker embedded applications to remove intercept handlers.
-     *
-     * @param interceptHandler the handler to remove.
-     */
-    public void removeInterceptHandler(InterceptHandler interceptHandler) {
-        if (!initialized) {
-            LOG.error("Moquette is not started, MQTT message interceptor cannot be removed. InterceptorId={}",
-                interceptHandler.getID());
-            throw new IllegalStateException("Can't deregister interceptors from a integration that is not yet started");
-        }
-        LOG.info("Removing MQTT message interceptor. InterceptorId={}", interceptHandler.getID());
-        interceptor.removeInterceptHandler(interceptHandler);
-    }
 }
