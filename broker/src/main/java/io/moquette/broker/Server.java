@@ -47,12 +47,10 @@ public class Server {
 
     private static final Logger LOG = LoggerFactory.getLogger(io.moquette.broker.Server.class);
 
-    private ScheduledExecutorService scheduler;
     private NewNettyAcceptor acceptor;
     private volatile boolean initialized;
     private PostOffice dispatcher;
     private BrokerInterceptor interceptor;
-    private H2Builder h2Builder;
 
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
@@ -72,67 +70,12 @@ public class Server {
         LOG.info("Starting Moquette integration. Configuration file path={}", defaultConfigurationFile.getAbsolutePath());
         IResourceLoader filesystemLoader = new FileResourceLoader(defaultConfigurationFile);
         final IConfig config = new ResourceLoaderConfig(filesystemLoader);
-        startServer(config);
+        startServer(config, null, null, null, null);
     }
 
     private static File defaultConfigFile() {
         String configPath = System.getProperty("moquette.path", null);
         return new File(configPath, IConfig.DEFAULT_CONFIG);
-    }
-
-    /**
-     * Starts Moquette bringing the configuration from the given file
-     *
-     * @param configFile text file that contains the configuration.
-     * @throws IOException in case of any IO Error.
-     */
-    public void startServer(File configFile) throws IOException {
-        LOG.info("Starting Moquette integration. Configuration file path: {}", configFile.getAbsolutePath());
-        IResourceLoader filesystemLoader = new FileResourceLoader(configFile);
-        final IConfig config = new ResourceLoaderConfig(filesystemLoader);
-        startServer(config);
-    }
-
-    /**
-     * Starts the integration with the given properties.
-     * <p>
-     * Its suggested to at least have the following properties:
-     * <ul>
-     *  <li>port</li>
-     *  <li>password_file</li>
-     * </ul>
-     *
-     * @param configProps the properties map to use as configuration.
-     * @throws IOException in case of any IO Error.
-     */
-    public void startServer(Properties configProps) throws IOException {
-        LOG.debug("Starting Moquette integration using properties object");
-        final IConfig config = new MemoryConfig(configProps);
-        startServer(config);
-    }
-
-    /**
-     * Starts Moquette bringing the configuration files from the given Config implementation.
-     *
-     * @param config the configuration to use to start the broker.
-     * @throws IOException in case of any IO Error.
-     */
-    public void startServer(IConfig config) throws IOException {
-        LOG.debug("Starting Moquette integration using IConfig instance");
-        startServer(config, null);
-    }
-
-    /**
-     * Starts Moquette with config provided by an implementation of IConfig class and with the set
-     * of InterceptHandler.
-     *
-     * @param config   the configuration to use to start the broker.
-     * @param handlers the handlers to install in the broker.
-     * @throws IOException in case of any IO Error.
-     */
-    public void startServer(IConfig config, List<? extends InterceptHandler> handlers) throws IOException {
-        LOG.debug("Starting moquette integration using IConfig instance and intercept handlers");
-        startServer(config, handlers, null, null, null);
     }
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
@@ -142,8 +85,6 @@ public class Server {
             handlers = Collections.emptyList();
         }
         LOG.trace("Starting Moquette Server. MQTT message interceptors={}", getInterceptorIds(handlers));
-
-        scheduler = Executors.newScheduledThreadPool(1);
 
         final String handlerProp = System.getProperty(BrokerConstants.INTERCEPT_HANDLER_PROPERTY_NAME);
         if (handlerProp != null) {
@@ -163,18 +104,11 @@ public class Server {
         final ISubscriptionsRepository subscriptionsRepository;
         final IQueueRepository queueRepository;
         final IRetainedRepository retainedRepository;
-        if (persistencePath != null && !persistencePath.isEmpty()) {
-            LOG.trace("Configuring H2 subscriptions store to {}", persistencePath);
-            h2Builder = new H2Builder(config, scheduler).initStore();
-            subscriptionsRepository = h2Builder.subscriptionsRepository();
-            queueRepository = h2Builder.queueRepository();
-            retainedRepository = h2Builder.retainedRepository();
-        } else {
-            LOG.trace("Configuring in-memory subscriptions store");
-            subscriptionsRepository = new MemorySubscriptionsRepository();
-            queueRepository = new MemoryQueueRepository();
-            retainedRepository = new MemoryRetainedRepository();
-        }
+
+        LOG.trace("Configuring in-memory subscriptions store");
+        subscriptionsRepository = new MemorySubscriptionsRepository();
+        queueRepository = new MemoryQueueRepository();
+        retainedRepository = new MemoryRetainedRepository();
 
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         subscriptions.init(subscriptionsRepository);
@@ -326,15 +260,6 @@ public class Server {
         acceptor.close();
         LOG.trace("Stopping MQTT protocol processor");
         initialized = false;
-
-        // calling shutdown() does not actually stop tasks that are not cancelled,
-        // and SessionsRepository does not stop its tasks. Thus shutdownNow().
-        scheduler.shutdownNow();
-
-        if (h2Builder != null) {
-            LOG.trace("Shutting down H2 persistence {}");
-            h2Builder.closeStore();
-        }
 
         LOG.info("Moquette integration has been stopped.");
     }
